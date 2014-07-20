@@ -144,9 +144,6 @@ function draw() {
         var points = lines[j].points;
         drawLine(points[0], points[1], color);
     }   
-    context.fillRect(x, y, 20, 20);
-    
-    context.fillRect(x + size, y, 20, 20);
     requestAnimationFrame(draw);
 }
 
