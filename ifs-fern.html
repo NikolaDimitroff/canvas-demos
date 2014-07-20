@@ -1,0 +1,102 @@
+<canvas id="ifs" width="100%" height="100%">
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+}
+#ifs {
+    border: 1px solid black;
+}
+</style>
+
+<script>
+var canvas = document.getElementById("ifs"),
+    context = canvas.getContext("2d");
+
+function onresize() {
+    canvas.width = document.body.offsetWidth;
+    canvas.height = document.body.offsetHeight;
+    window.aspect = canvas.width / canvas.height;
+};
+onresize();
+window.resize = onresize;
+
+
+var randomChoice = function(list, weight) {
+    var total_weight = weight.reduce(function (prev, cur, i, arr) {
+        return prev + cur;
+    });
+     
+    var random_num = Math.random() * total_weight;
+    var weight_sum = 0;
+     
+    for (var i = 0; i < list.length; i++) {
+        weight_sum += weight[i];
+        
+        if (random_num <= weight_sum) {
+            return list[i];
+        }
+    }
+};
+
+var Vector2 = function (x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+var fern = {
+    functions: [
+        function (p) {
+            return new Vector2(0, 0.16 * p.y);
+        },
+        function (p) {
+            var x = 0.85 * p.x + 0.04 * p.y;
+            var y = -0.04 * p.x + 0.85 * p.y + 1.6;
+            return new Vector2(x, y);
+        },
+        function (p) {
+            var x = 0.2 * p.x - 0.26 * p.y;
+            var y = 0.23 * p.x + 0.22 * p.y + 1.6;
+            return new Vector2(x, y);
+        },
+        function (p) {
+            var x = -0.15 * p.x + 0.28 * p.y;
+            var y = 0.26 * p.x + 0.24 * p.y + 0.44;
+            return new Vector2(x, y);
+        },
+    
+    ],
+    weights: [0.01, 0.85, 0.07, 0.07],
+    points: [new Vector2(0, 0)],
+}
+
+var ifs = fern;
+
+var MAX_ITERATIONS = 1e7;
+var POINT_SIZE = 1/30;
+
+
+var construct = function () {
+    var points = ifs.points;
+    for (var i = 0; i < MAX_ITERATIONS; i++) {
+        var randFunction = randomChoice(ifs.functions, ifs.weights);
+        points.push(randFunction(points[points.length - 1]));
+    }
+}
+
+
+var scale = 2;
+context.translate(canvas.width / 2, 0);
+context.scale(scale, scale);
+context.fillStyle = "green";    
+var drawPoints = function () {
+    var points = ifs.points;
+    var k = 1 / POINT_SIZE;
+    for (var i = 0; i < points.length; i++) {
+        context.fillRect(points[i].x * k, points[i].y * k, POINT_SIZE, POINT_SIZE);
+    }
+}
+
+construct();
+drawPoints();
+</script>
