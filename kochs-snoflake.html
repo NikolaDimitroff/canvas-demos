@@ -1,0 +1,158 @@
+<canvas id="flake" width="100%" height="100%">
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+}
+#flake {
+    border: 1px solid black;
+}
+</style>
+
+<script>
+var canvas = document.getElementById("flake"),
+    context = canvas.getContext("2d");
+
+function onresize() {
+    canvas.width = document.body.offsetWidth;
+    canvas.height = document.body.offsetHeight;
+    window.aspect = canvas.width / canvas.height;
+};
+onresize();
+window.resize = onresize;
+
+
+var Vector2 = function (x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+Vector2.prototype.dot = function (other) {
+    return this.x * other.x + this.y * other.y;
+}
+
+Vector2.prototype.distTo = function (other) {
+    return Math.sqrt((this.x - other.x) * (this.x - other.x) + 
+                     (this.y - other.y) * (this.y - other.y))
+};
+
+Vector2.prototype.len = function() {
+    return Math.sqrt(this.x * this.x + this.y * this.y)
+};
+
+Vector2.prototype.normalize = function() {
+    var len = this.len();
+    this.x /= len;
+    this.y /= len;
+}
+
+Vector2.prototype.sub = function (other) {
+    return new Vector2(this.x - other.x, this.y - other.y);
+}
+
+Vector2.prototype.scale = function(scalar) {
+    this.x *= scalar;
+    this.y *= scalar;
+}
+   
+var Triangle = function (p, q, r) {
+    this.points = [p, q, r];
+}
+
+var Line = function (p, q) {
+    this.points = [p, q];
+}
+
+function sign(x) {
+    if (x == 0) return 0;
+    if (x > 0) return 1;
+    return -1;
+}
+
+
+var center = new Vector2(0, 0);
+function generateLines(p, q) {
+    var dist = p.distTo(q);
+    var middle = new Vector2((p.x + q.x)  / 2, (p.y + q.y) / 2);
+    var size = dist / 3;
+    
+    var normal = new Vector2((q.y - p.y) / (q.x - p.x), -1);
+    var normSize = Math.sqrt(3) / 2 * size;
+    var edge = p.sub(center);
+    var dotSign = sign(edge.dot(normal));
+    normal.normalize();
+    normal.scale(dotSign * normSize);
+    
+    var first = new Vector2(1/3 * p.x + 2/3 * q.x, 1/3 * p.y + 2/3 * q.y);
+    var second = new Vector2(2/3 * p.x + 1/3 * q.x, 2/3 * p.y + 1/3 * q.y);
+    var third = new Vector2(middle.x + normal.x, middle.y + normal.y)
+    
+    return [new Line(p, second), new Line(first, q), new Line(first, third), new Line(second, third)]
+            ;    
+}
+
+var size = 0.85 * Math.min(canvas.width, canvas.height);
+var x = canvas.width / 2 - size / 2,
+    y = canvas.height / 2 + size / 3.4;
+var first = new Vector2(x, y);
+var second = new Vector2(x + size, y);
+var third = new Vector2(x + size / 2, y - Math.sqrt(3) / 2 * size);
+
+var lines = [
+    new Line(first, second), 
+    new Line(first, third), 
+    new Line(second, third)
+];
+center.x = 1/3 * (first.x + second.x + third.x),
+center.y = 1/3 * (first.y + second.y + third.y);
+    
+var MAX_ITERATIONS = 5;
+var iterations = 0;
+    
+function update() {
+    var next = [];
+    for (var i = 0; i < lines.length; i++) {
+        var points = lines[i].points;
+        var generated = generateLines(points[0], points[1]);
+        for (var j = 0; j < generated.length; j++) {
+            next.push(generated[j]);
+        }        
+    }
+    lines = next;
+
+    if (iterations < MAX_ITERATIONS) {
+        iterations++;
+        setTimeout(update, 1000);
+    }
+}
+
+    
+var color = "red";
+
+function drawLine(p, q, color) {
+    context.beginPath();
+    context.strokeStyle = color;
+    context.moveTo(p.x, p.y);
+    context.lineTo(q.x, q.y);
+    context.closePath();
+    context.stroke();   
+}
+
+function draw() {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    for (var j = 0; j < lines.length; j++) {
+        var points = lines[j].points;
+        drawLine(points[0], points[1], color);
+    }   
+    context.fillRect(x, y, 20, 20);
+    
+    context.fillRect(x + size, y, 20, 20);
+    requestAnimationFrame(draw);
+}
+
+function loop() {
+    draw();
+    setTimeout(update, 1000);
+}
+loop();
+</script>

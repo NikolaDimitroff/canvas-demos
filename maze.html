@@ -1,0 +1,168 @@
+<canvas id="maze" width="100%" height="100%"/>
+
+<style>
+#maze {
+    border: 1px solid black;
+}
+html, body {
+    margin: 0;
+    padding: 0;
+}
+</style>
+
+<script>
+
+
+var canvas = document.getElementById("maze"),
+    context = canvas.getContext("2d");
+
+function onresize() {
+    canvas.width = document.body.offsetWidth;
+    canvas.height = document.body.offsetHeight;
+    window.aspect = canvas.width / canvas.height;
+};
+onresize();
+window.resize = onresize;
+
+var Node = function (r, c) {
+    this.r = r;
+    this.c = c;
+}
+
+var SIZE = 100;
+var graphSize = {
+    rows: SIZE,
+    cols: ~~(SIZE / window.aspect)
+}
+
+function children(node) {
+    var children = [];
+    if (node.r > 0)
+        children.push(new Node(node.r - 1, node.c))
+    if (node.r < graphSize.rows - 1)
+        children.push(new Node(node.r + 1, node.c))
+    if (node.c > 0)
+        children.push(new Node(node.r, node.c - 1))
+    if (node.c < graphSize.cols - 1)
+        children.push(new Node(node.r, node.c + 1))
+        
+    return children;
+}
+
+
+function extendedChildren(node) {
+    var children = []
+    
+    if (node.r > 0 && node.c > 0)
+        children.push(new Node(node.r - 1, node.c - 1));
+    if (node.r < graphSize.rows - 1 && node.c > 0)
+        children.push(new Node(node.r + 1, node.c - 1));
+    if (node.r > 0 && node.c < graphSize.cols - 1)
+        children.push(new Node(node.r - 1, node.c + 1));
+    if (node.r < graphSize.rows - 1 && node.c < graphSize.cols - 1)
+        children.push(new Node(node.r + 1, node.c + 1));    
+    
+    return children;
+}
+
+function isVisited(visited, parent, node) {
+    parentIndex = index(parent)
+    nodeIndex = index(node);
+    if (visited[nodeIndex]) return false;
+    var neighbours = children(node);
+    var count = 0;
+    for (var i = 0; i < neighbours.length; i++) {
+        var nextIndex = index(neighbours[i])
+        if (visited[nextIndex] && 
+            nextIndex != nodeIndex &&
+            nextIndex != parentIndex)
+            count++;
+    }
+    if (count > 0) return false;
+    neighbours = extendedChildren(node);
+    count = 0;
+    var siblings = children(parent).map(index);
+    for (var i = 0; i < neighbours.length; i++) {
+        var nextIndex = index(neighbours[i])
+        if (visited[nextIndex] &&
+            siblings.indexOf(nextIndex) == -1)
+            count++;
+    }
+    return count <= 0;
+}
+
+function index(node) {
+    return node.r * graphSize.cols + node.c;
+}
+
+frames = [];
+
+function build(graph, node) {
+    var frontier = [node],
+        visited = [];
+    
+    var boardSize = graphSize.rows * graphSize.cols;
+    var visitTest = isVisited.bind(undefined, visited);
+    while (Object.keys(visited).length <= boardSize - 1) {
+        var nodeIndex = index(node);
+        var neighbours = children(node).filter(visitTest.bind(undefined, node));
+        if (neighbours.length != 0) {
+            graph[nodeIndex] = true;            
+            node = neighbours[~~(Math.random() * neighbours.length)];
+            frontier.push(node);
+        }
+        else if (frontier.length != 0) {
+            node = frontier.pop();
+        }
+        else {
+            var nextNode, nextNodeIndex;
+            do {
+                nextNode = new Node(~~(Math.random() * graphSize.rows),
+                                    ~~(Math.random() * graphSize.cols));
+                nextNodeIndex = index(nextNode);
+            }
+            while (visited[nextNodeIndex]);
+            node = nextNode;            
+        }        
+        visited[nodeIndex] = true;   
+        var frameString = JSON.stringify(graph);
+        if (frameString != JSON.stringify(frames[frames.length - 1]))
+            frames.push(JSON.parse(frameString));
+    }
+}
+
+
+function draw() {
+    context.fillStyle = "black";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "white";
+    var cellSizeX = canvas.width / graphSize.rows;
+    var cellSizeY = canvas.height / graphSize.cols;
+    
+    for (var i = 0; i < graphSize.rows; i++) {
+        for (var j = 0; j < graphSize.cols; j++) {
+            var node = new Node(i, j);
+            if (graph[index(node)]) {
+                context.fillRect(i * cellSizeX, j * cellSizeY, cellSizeX, cellSizeY);
+            }
+        }
+    }
+}
+
+function drawAnim() { 
+    var i = 0;
+    setInterval(function () {
+        if (i < frames.length) {
+            graph = frames[i++];
+            draw();
+        }
+    }, 1000/60);
+}
+
+
+var starting = new Node(0, 0);
+var graph = [index(starting)];
+build(graph, starting);
+drawAnim();
+
+</script>
