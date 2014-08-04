@@ -1,0 +1,232 @@
+<nav>
+<p>
+    Click 'Regenerate' below when ready<br>
+    (might take some time)
+</p>
+<label for="sides">Polygon Sides: </label>
+<input id="sides" type="number" min="3" max="20" value="6"></input>
+<br>
+<label for="iterations">Iterations: </label>
+<input id="iterations" type="number" min="1" max="10" value="5"></input>
+<br>
+<label for="schemes">Color Scheme: </label>
+<select id="schemes"></select>
+<br>
+<button id="regenerate-button" >Regenerate</button>
+</nav>
+<canvas id="tiling" width="100%" height="100%"/>
+
+<style>
+#tiling {
+    border: 1px solid black;
+}
+html, body {
+    margin: 0;
+    padding: 0;
+}
+nav {
+    position: absolute;
+    left: 10;
+    top: 100;
+    background-color: #EEE;
+    border: 1px solid black;
+}
+</style>
+
+<script src="vector.js"></script>
+<script src="resizer.js"></script>
+<script>
+var canvas = document.getElementById("tiling"),
+    context = canvas.getContext("2d");
+
+Resizer.installHandler(canvas);
+
+var ColorSchemes = {
+    basic: [
+        "yellow",
+        "blue",
+        "green",
+        "red",
+    ],
+    nighty: [
+        "#575751",
+        "#526b64",
+        "#79a693",
+        "#d9d9a9",
+    ],
+    ocean: [
+        "#c5e8eb",
+        "#54d9e8",
+        "#2793d6",
+        "#264540"
+    ],
+    flight: [
+        "#f2eac2",
+        "#dbbe9b",
+        "#f76848",
+        "#e5ed74",
+    ],
+    pinky: [
+        "#c785aa",
+        "#9e5473",
+        "#573b47",
+        "#e08b9d",
+    ],
+    strawberry: [
+        "#e8e8eb",
+        "#f7dddc",
+        "#d14545",
+    ],
+    forest: [
+        "#447d50",
+        "#2c5244",
+        "#91bd63",
+        "#c3d97b",
+    ],
+    persian: [
+        "#edd18b",
+        "#bd882d",
+        "#e3ba3d",
+        "#4f3f3a",
+    ]
+}
+
+var COLORS = ColorSchemes["basic"];
+
+function RegularPolygon (sides, center, radius, rotation, color) {
+    rotation = rotation || 0;
+    color = (color || 0) % COLORS.length;
+    this.points = [];
+    this.fillColor = COLORS[color];
+    
+    for (var i = 0; i < sides; i++) {
+        var x = center.x + radius * Math.cos(rotation + i * 2 * Math.PI / sides),
+            y = center.y + radius * Math.sin(rotation + i * 2 * Math.PI / sides);
+        
+        this.points.push(new Vector2(x, y));
+    }
+    
+    this.center = center;
+    this.radius = radius;
+    this.rotation = rotation;
+    this.color = color;
+}
+
+RegularPolygon.prototype.split = function () {
+    var ratio = 0.75 * 0.5;
+    var r1 = this.radius * ratio,
+        r2 = this.radius * ratio;
+        
+    var children = [];
+    children.push(new RegularPolygon(this.points.length, this.center, r1, -this.rotation, this.color));
+    
+    var n = this.points.length;
+    for (var i = 0; i < n; i++) {
+        var p = this.points[i % n],
+            q = this.points[(i + 1) % n];
+            
+        var mid = p.add(q).scaled(0.5);
+        var centerToMid = mid.sub(this.center);
+        centerToMid.normalize();
+        centerToMid.scale(this.radius / 2);
+        var newCenter = this.center.add(centerToMid);
+        
+        children.push(new RegularPolygon(n, newCenter, r2, -this.rotation + Math.PI / n, this.color + 1));
+    }
+    
+    
+    return children;    
+}
+
+RegularPolygon.prototype.draw = function (context) {
+    context.beginPath();
+    
+    context.moveTo(this.points[0].x, this.points[0].y);
+    
+    for (var i = 1; i < this.points.length; i++) {
+        context.lineTo(this.points[i].x, this.points[i].y);
+    }
+    
+    context.closePath();
+    context.stroke();
+    context.fillStyle = this.fillColor;
+    context.fill();
+}
+
+function run(sides, maxiterations) {
+    var SIDES = sides;
+    var Figure = RegularPolygon.bind(undefined, SIDES);
+
+    var SIZE = Math.max(canvas.width, canvas.height);
+    var CENTER = new Vector2(canvas.width / 2, canvas.height / 2);
+    var p1 = new Figure(CENTER, SIZE, 3 * Math.PI / 2);
+    var polygons = [p1];
+
+    var update = function update(iterations) {
+        var perlevel = SIDES + 1;
+        var lastLevel = Math.pow(perlevel, iterations),
+            prevLevel = Math.pow(perlevel, iterations - 1);
+        
+        var len = polygons.length;
+        var arrays = [polygons.slice(len - (lastLevel + prevLevel))];
+        for (var i = len - 1; i >= len - lastLevel; i--) {
+            arrays.push(polygons[i].split());    
+        }
+        polygons = [].concat.apply([], arrays); // fastest way to concatenate arrays
+    }
+
+    var draw = function draw() {
+        context.fillStyle = "rgba(255, 255, 255, 0)";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        
+        polygons.forEach(function (p) { p.draw(context) });  
+        requestAnimationFrame(draw);
+    };
+
+
+    var iterations = 0;
+    var MAX_ITERATIONS = maxiterations;
+    function cycle() {
+        update(iterations);
+        iterations++;
+
+        if (iterations < MAX_ITERATIONS)
+            setTimeout(cycle, 1000);
+        else
+            setTimeout(function () { alert("Done!") }, 10);
+    }
+
+    cycle();
+    draw();
+}
+
+function regenerate() {
+    var schemes = document.getElementById("schemes");
+    var sides = ~~document.getElementById("sides").value,
+        iterations = ~~document.getElementById("iterations").value,
+        scheme = ColorSchemes[schemes[schemes.selectedIndex].innerHTML];
+        
+    COLORS = scheme;
+        
+    console.log(sides, iterations);
+    run(sides, iterations);
+};
+
+document.getElementById("regenerate-button").onclick = regenerate;
+
+var schemes = document.getElementById("schemes");
+for (var i in ColorSchemes) {
+    var option = document.createElement("option");
+    option.text = i;
+    schemes.appendChild(option);
+}
+
+// Defaults
+document.getElementById("sides").value = 6;
+document.getElementById("iterations").value = 5;
+schemes.selectedIndex = 1 + ~~(Math.random() * (Object.keys(ColorSchemes).length - 2));
+
+// Start at page load
+regenerate();
+</script>
