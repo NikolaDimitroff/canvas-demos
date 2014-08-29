@@ -4,23 +4,15 @@ html, body {
     margin: 0;
     padding: 0;
 }
-#flake {
-    border: 1px solid black;
-}
 </style>
 
 <script src="js/vector.js"></script>
+<script src="js/resizer.js"></script>
 <script>
 var canvas = document.getElementById("flake"),
     context = canvas.getContext("2d");
 
-function onresize() {
-    canvas.width = document.body.offsetWidth;
-    canvas.height = document.body.offsetHeight;
-    window.aspect = canvas.width / canvas.height;
-};
-onresize();
-window.resize = onresize;
+Resizer.installHandler(canvas);
 
 
 var Triangle = function (p, q, r) {
