@@ -1,0 +1,17 @@
+canvas {
+    border: 1px solid black;
+}
+html, body {
+    margin: 0;
+    padding: 0;
+}
+nav {
+    position: absolute;
+    left: 8;
+    top: 8;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+nav input {
+    max-width: 50px;
+}

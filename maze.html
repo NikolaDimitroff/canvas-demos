@@ -9,20 +9,12 @@ html, body {
     padding: 0;
 }
 </style>
-
+<script src="js/resizer.js"></script>
 <script>
-
-
 var canvas = document.getElementById("maze"),
     context = canvas.getContext("2d");
 
-function onresize() {
-    canvas.width = document.body.offsetWidth;
-    canvas.height = document.body.offsetHeight;
-    window.aspect = canvas.width / canvas.height;
-};
-onresize();
-window.resize = onresize;
+Resizer.installHandler(canvas);
 
 var Node = function (r, c) {
     this.r = r;

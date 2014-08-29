@@ -1,0 +1,240 @@
+<html>
+<head>
+    <title>Flocking behaviour demo</title>
+    <link rel="stylesheet" href="css/default.css">
+
+</head>
+<body>
+<nav>
+    <label for="separation">Separation Weight (pushes them apart): </label>
+    <input id="separation" data-bind="value: separationWeight" type="number" step="1"></input>
+    <br>
+    <label for="alignment">Alignment Weight (aligns their headings): </label>
+    <input id="alignment" data-bind="value: alignmentWeight" type="number" step="1"></input>
+    <br>
+    <label for="cohesion">Cohesion Weight (pushes them together): </label>
+    <input id="cohesion" data-bind="value: cohesionWeight" type="number" step="1"></input>
+    <br>
+    <label for="mouse-follow">Mouse Follow Weight (pushes them towards the mouse): </label>
+    <input id="mouse-follow" data-bind="value: mouseFollowWeight" type="number" step="5"></input>
+    <br>
+    <label for="neighbour-radius">Neighbourhood Radius:</label>
+    <input id="neighbour-radius" data-bind="value: radius" type="number" step="1"></input>
+    <br>
+    <label for="show-forces">Show velocities?: </label>
+    <input id="show-forces" data-bind="checked: showForces" type="checkbox"></input>
+    <br>
+</nav>
+<canvas id="canvas" width="100%" height="100%"/>
+
+</body>
+</html>
+
+<script src="js/vector.js"></script>
+<script src="js/resizer.js"></script>
+<script src="js/mouser.js"></script>
+<script src="js/primitives.js"></script>
+<script src="js/animated-sprite.js"></script>
+<script src="js/knockout-3.1.0.js"></script>
+<script>
+
+var viewmodel = {
+    separationWeight: ko.observable(100),
+    alignmentWeight: ko.observable(10),
+    cohesionWeight: ko.observable(1),
+    mouseFollowWeight: ko.observable(40),
+    radius: ko.observable(40),
+    showForces: ko.observable(false),
+}
+
+
+var canvas = document.getElementById("canvas"),
+    context = canvas.getContext("2d");
+
+Resizer.installHandler(canvas);
+Mouser.installHandler(canvas);
+
+var MAX_BIRDS = 50;
+var MAX_FORCE = 20
+var SEEK_SPEED = 5;
+
+function Bird(x, y, size, img, frames) {
+    this.pos = new Vector2(x, y);
+    this.vec = new Vector2();
+    this.acc = new Vector2();
+    this.size = size;
+    this.sprite = new AnimatedSprite(img, frames);
+}
+
+Bird.prototype.update = function (flock) {
+    this.computeForce(flock);
+    if (this.acc.len() <= 0.5) // less gibberish movement
+        this.acc.x = this.acc.y = 0;
+    this.vec = this.vec.add(this.acc);
+    this.pos = this.pos.add(this.vec);
+    
+    this.sprite.update();
+}
+
+function computeSeparation(bird, neighbours) {
+    var total = new Vector2();
+    for (var i = 0; i < neighbours.length; i++) {
+        if (bird != neighbours[i]) {
+            var inbetween = bird.pos.sub(neighbours[i].pos);
+            var dist = inbetween.len();
+            inbetween.scale(1 / (dist * dist));
+            total = total.add(inbetween);
+        }
+    }
+    return total;
+}
+
+function computeSeek(bird, to) {
+    var total = to.sub(bird.pos);
+    total.normalize();
+    total.scale(SEEK_SPEED);
+    return total.sub(bird.vec);
+}
+
+function computeAlignment(bird, neighbours) {
+    var total = new Vector2();
+    for (var i = 0; i < neighbours.length; i++) {
+        if (bird != neighbours[i]) {
+            var direction = neighbours[i].vec;
+            total = total.add(direction);
+        }
+    }
+    total.scale(1 / (neighbours.length - 1));
+    total = total.sub(bird.vec);
+    return total;
+}
+
+function computeCohesion(bird, neighbours) {
+    var total = computeCenterOfMass(neighbours);
+    total = computeSeek(bird, total);
+    return total;
+}
+
+function computeCenterOfMass(flock) {
+    var total = new Vector2();
+    for (var i = 0; i < flock.length; i++) {
+        var pos = flock[i].pos;
+        total = total.add(pos);
+    }
+    total.scale(1 / flock.length);
+    return total;
+}
+
+Bird.prototype.computeForce = function (flock) {
+    var neighbours = flock.filter(function (bird) {
+        return bird.pos.distToSquared(this.pos) <= viewmodel.radius() * viewmodel.radius()
+    }.bind(this));
+    
+    var separationWeight = viewmodel.separationWeight(),
+        alignmentWeight = viewmodel.alignmentWeight(),
+        cohesionWeight = viewmodel.cohesionWeight();
+    
+    var separation = computeSeparation(this, neighbours).scaled(separationWeight);
+    var alignment = computeAlignment(this, neighbours).scaled(alignmentWeight);
+    var cohesion = computeCohesion(this, neighbours).scaled(cohesionWeight);
+    var force = separation.add(alignment).add(cohesion);
+    this.acc.scale(0.01); // Air resistance
+    this.acc = this.acc.add(force);// mass = 1
+    this.acc.scale(0.1);
+    this.acc.truncate(MAX_FORCE);
+}
+
+Bird.prototype.applyForce = function (force) {
+    this.acc = this.acc.add(force);
+}
+
+Bird.prototype.draw = function () {
+    var angle = Vector2.right.angleTo(this.vec);
+    var cx = this.pos.x + this.sprite.img.width / 2,
+        cy = this.pos.y + this.sprite.frameHeight / 2;
+        
+    context.save();
+    context.translate(cx, cy);
+    context.rotate(angle);
+    context.translate(-cx, -cy);
+    this.sprite.draw(this.pos.x, this.pos.y);
+    context.restore();
+
+    if (viewmodel.showForces()) {
+        var scale = 100;
+        var l = new Primitives.Line(cx, cy, cx + this.vec.x * scale, cy + this.vec.y * scale);
+        l.drawWithArrowheads(context);
+    }
+}
+
+function init(birdImage, frames, spawningInfo) {
+    var flock = [];
+    for (var i = 0; i < spawningInfo.birdCount; i++) {
+        var x = spawningInfo.x + Math.random() * spawningInfo.width,
+            y = spawningInfo.y + Math.random() * spawningInfo.height;
+        flock.push(new Bird(x, y, 10, birdImage, frames));
+    }
+    
+    return flock;
+}
+
+var update = function (flock) {
+    var mousePos = new Vector2(window.mouse.x, window.mouse.y);
+    var mousePower = viewmodel.mouseFollowWeight();
+    var windX = 100,
+        windY = 0;
+    for (var i = 0; i < flock.length; i++) {
+        flock[i].update(flock);
+        flock[i].applyForce(computeSeek(flock[i], mousePos).scaled(mousePower));
+        //flock[i].applyForce(new Vector2(Math.random() * windX, Math.random() * windY));
+    }
+}
+
+
+var draw = function (flock) {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "rgba(0, 0, 0, 0)";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    
+    
+    var center = computeCenterOfMass(flock);
+    
+    context.fillStyle = "black";
+    
+    
+    for (var i = 0; i < flock.length; i++) {
+        flock[i].draw();
+    }
+}
+
+function loop(flock) {
+    draw(flock);
+    update(flock);
+    requestAnimationFrame(function () { 
+        loop(flock); 
+    });
+}
+
+var frames = 22;
+var spawningInfo = { 
+    x: 100,
+    y: 100,
+    width: 100,
+    height: 100,
+    birdCount: 50,
+};
+var birdImage = new Image();
+birdImage.onload = function () { 
+    var flock = init(birdImage, frames, spawningInfo);
+    window.onmousedown = function () {
+        flock.filter(function (bird) {
+            return bird.pos.distToSquared(window.mouse) <= RADIUS_SQUARED;
+        });
+        
+    }
+    loop(flock);
+}
+birdImage.src = "img/birdb.png";
+
+ko.applyBindings(viewmodel);
+</script>

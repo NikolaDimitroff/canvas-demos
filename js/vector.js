@@ -1,5 +1,7 @@
 
 var Vector2 = function (x, y) {
+    x = x || 0;
+    y = y || 0;
     this.x = x;
     this.y = y;
 }
@@ -12,9 +14,30 @@ Vector2.prototype.dot = function (other) {
     return this.x * other.x + this.y * other.y;
 }
 
+Vector2.prototype.angleTo = function (other) {
+    var n1 = this.copy(),
+        n2 = other.copy();
+    n1.normalize();
+    n2.normalize();
+    var cos = n1.dot(n2);
+    var sin = ((n2.x + n2.y) - (n1.x + n1.y) * cos) / (n1.x - n1.y);
+    var angle = Math.acos(cos);
+    
+    if (sin <= 0)
+        angle = -angle;
+        
+    angle += Math.PI / 2
+    return angle;
+}
+
 Vector2.prototype.distTo = function (other) {
     return Math.sqrt((this.x - other.x) * (this.x - other.x) + 
                      (this.y - other.y) * (this.y - other.y))
+};
+
+Vector2.prototype.distToSquared = function (other) {
+    return (this.x - other.x) * (this.x - other.x) + 
+           (this.y - other.y) * (this.y - other.y);
 };
 
 Vector2.prototype.len = function() {
@@ -31,6 +54,10 @@ Vector2.prototype.sub = function (other) {
     return new Vector2(this.x - other.x, this.y - other.y);
 }
 
+Vector2.prototype.negate = function () {
+    return new Vector2(-this.x, -this.y);
+}
+
 Vector2.prototype.add = function (other) {
     return new Vector2(this.x + other.x, this.y + other.y);
 }
@@ -43,3 +70,13 @@ Vector2.prototype.scale = function(scalar) {
 Vector2.prototype.scaled = function(scalar) {
     return new Vector2(this.x * scalar, this.y * scalar);
 }
+
+Vector2.prototype.truncate = function (limit) {
+    var len = this.len();
+    if (len > limit) {
+        this.scale(limit / len);
+    }
+}
+
+Vector2.right = new Vector2(1, 0);
+Vector2.up = new Vector2(0, 1);
