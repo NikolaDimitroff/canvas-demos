@@ -226,12 +226,6 @@ var spawningInfo = {
 var birdImage = new Image();
 birdImage.onload = function () { 
     var flock = init(birdImage, frames, spawningInfo);
-    window.onmousedown = function () {
-        flock.filter(function (bird) {
-            return bird.pos.distToSquared(window.mouse) <= RADIUS_SQUARED;
-        });
-        
-    }
     loop(flock);
 }
 birdImage.src = "img/birdb.png";
