@@ -65,6 +65,10 @@ function fillLegend(channelCount) {
 }
 
 function playSound(buffer) {
+    if (audioSource) {
+        audioSource.stop();
+    }
+
   audioSource = audioContext.createBufferSource(); // creates a sound source
   audioSource.buffer = buffer;                    // tell the source which sound to play
   audioSource.connect(audioContext.destination);       // connect the source to the context's destination (the speakers)
@@ -79,8 +83,8 @@ fileInput.onchange = function() {
 	reader.onload = function(ev) {
 		audioContext.decodeAudioData(ev.target.result, function(buffer) {
             audioBuffer = buffer;
-            init();
             playSound(audioBuffer);
+            init();
             loop();
 		});
 	};
@@ -109,9 +113,6 @@ var init = function () {
     }
     if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
-    }
-    if (audioSource) {
-        audioSource.stop();
     }
 }
 

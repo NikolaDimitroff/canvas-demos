@@ -110,12 +110,13 @@ function RegularPolygon (sides, center, radius, rotation, color) {
 }
 
 RegularPolygon.prototype.split = function () {
-    var ratio = 0.75 * 0.5;
+    var ratio = 0.375;
     var r1 = this.radius * ratio,
         r2 = this.radius * ratio;
         
     var children = [];
-    children.push(new RegularPolygon(this.points.length, this.center, r1, -this.rotation, this.color));
+    var central = new RegularPolygon(this.points.length, this.center, r1, -this.rotation, this.color);
+    children.push(central);
     
     var n = this.points.length;
     for (var i = 0; i < n; i++) {
@@ -128,7 +129,8 @@ RegularPolygon.prototype.split = function () {
         centerToMid.scale(this.radius / 2);
         var newCenter = this.center.add(centerToMid);
         
-        children.push(new RegularPolygon(n, newCenter, r2, -this.rotation + Math.PI / n, this.color + 1));
+        var child = new RegularPolygon(n, newCenter, r2, -this.rotation + Math.PI / n, this.color + 1);
+        children.push(child);
     }
     
     
@@ -172,13 +174,13 @@ function run(sides, maxiterations) {
         polygons = [].concat.apply([], arrays); // fastest way to concatenate arrays
     }
 
+    var id = null;
     var draw = function draw() {
         context.fillStyle = "rgba(255, 255, 255, 0)";
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.clearRect(0, 0, canvas.width, canvas.height);
         
-        polygons.forEach(function (p) { p.draw(context) });  
-        requestAnimationFrame(draw);
+        polygons.forEach(function (p) { p.draw(context) }); 
     };
 
 
@@ -186,6 +188,7 @@ function run(sides, maxiterations) {
     var MAX_ITERATIONS = maxiterations;
     function cycle() {
         update(iterations);
+        draw();
         iterations++;
 
         if (iterations < MAX_ITERATIONS)
@@ -195,7 +198,6 @@ function run(sides, maxiterations) {
     }
 
     cycle();
-    draw();
 }
 
 function regenerate() {
