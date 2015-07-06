@@ -1,0 +1,303 @@
+<canvas id="voronoi" width="100%" height="100%"/>
+
+<style>
+#tiling {
+    border: 1px solid black;
+}
+html, body {
+    margin: 0;
+    padding: 0;
+}
+</style>
+
+<script src="js/vector.js"></script>
+<script src="js/resizer.js"></script>
+<script src="js/mouser.js"></script>
+<script src="js/primitives.js"></script>
+<script>
+var canvas = document.getElementById("voronoi"),
+    context = canvas.getContext("2d");
+
+Resizer.installHandler(canvas);
+Mouser.installHandler(canvas);
+
+var swap = function (obj1, obj2, prop) {
+    var temp = obj1[prop];
+    obj1[prop] = obj2[prop];
+    obj2[prop] = temp;
+};
+
+function randomColor() {
+    return '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16);
+}
+
+var epsilonEquals = function (x, y, epsilon) {
+    if (!epsilon) {
+        epsilon = 1e-4;
+    }
+    return Math.abs(x, y) < epsilon;
+};
+
+var Collidables = (function () {
+
+var IntersectionType = {
+    empty: 0,
+    singlePoint: 1,
+    range: 2
+};
+
+var Intersection = (function () {
+    function Intersection(type, arg1, arg2, arg3, arg4) {
+        this.type = type;
+        switch (type) {
+            case IntersectionType.empty:
+                // Intentionally empty
+            break;
+            case IntersectionType.singlePoint:
+                this.point = arg1;
+            break;
+            case IntersectionType.range:
+                this.rangeStart = arg1;
+                this.rangeEnd = arg2;
+                this.parameterRangeStart = arg3;
+                this.parameterRangeEnd = arg4;
+            break;
+            default:
+                throw new Error("Invalid intersection type!");
+        }
+    }
+
+    Intersection.prototype.getDrawable = function () {
+        switch (this.type) {
+            case IntersectionType.singlePoint:
+                // Arbitrary radius
+                return new Collidables.Circle(this.point, 10);
+            break;
+            case IntersectionType.range:
+                return new Collidables.LineSegment(this.rangeStart, this.rangeEnd);
+            break;
+            default:
+                return null;
+        }
+    };
+    
+    return Intersection;
+})();
+
+var Line = (function () {
+    function Line(a, b) {
+        // y = kx + b
+        // k = dy / dx
+        // b = y_i - kx_i
+        this.slope = (a.y - b.y) / (a.x - b.x);
+        this.offset = a.y - this.slope * a.x;
+        // The line's standart equation is kx - y + b= 0,
+        // Thus, normalize((k, -1)) is normal to the line whilenormalize
+        // normalize((1, k)) is collinear
+        this.collinear = new Vector2(1, this.slope);
+        this.collinear.normalize();
+        this.color = randomColor();
+    }
+
+    Line.prototype.draw = function (context) {
+        var firstVisiblePoint = new Vector2(0, this.offset);
+        var canvasWidth = context.canvas.width;
+        var lastVisiblePoint = new Vector2(canvasWidth,
+                                           this.slope * canvasWidth + this.offset);
+        context.save();
+        context.strokeStyle = this.color;
+        context.beginPath();
+        context.moveTo(firstVisiblePoint.x, firstVisiblePoint.y);
+        context.lineTo(lastVisiblePoint.x, lastVisiblePoint.y);
+        context.stroke();
+        context.restore();
+    };
+
+    Line.prototype.intersect = function (figure) {
+        switch (figure.constructor) {
+            case Collidables.Line:
+                // k1x + b1 = k2x + b2
+                // k1x - k2x = b2 - b1
+                // x = (b2 - b1) / (k1 - k2)
+                if (epsilonEquals(this.slope, figure.slope)) {
+                    return new Collidables.Intersection(IntersectionType.empty);
+                }
+                var x = (figure.offset - this.offset) / (this.slope - figure.slope);
+                var y = this.slope * x + this.offset;
+                return new Collidables.Intersection(IntersectionType.singlePoint, new Vector2(x, y));
+            break;
+            case Collidables.Rect:
+                var rect = figure;
+                // Let the area under the rect be defined as all points P such as
+                //    rect.topLeft <= P <= rect.topLeft + rect.size
+                // Let M = randomPointFromL + lambda * l.collinear.
+                // See if there's an M for which the rect inequalities hold
+                var pointFromLine = new Vector2(0, this.offset);
+                var oneOverCollinear = new Vector2(1 / this.collinear.x,
+                                                   1 / this.collinear.y);
+                // topLeft <= pointFromLine + lambda * collinear
+                var lowerBound = rect.topLeft.sub(pointFromLine)
+                                             .componentProduct(oneOverCollinear);
+                // pointFromLine + lambda * collinear <= rect.topLeft + rect.size
+                var upperBound = rect.topLeft.add(rect.size)
+                                             .sub(pointFromLine)
+                                             .componentProduct(oneOverCollinear);
+                // If it was the case that either of collinear components was
+                // negative, the inequalities containg it should be swapped
+                if (this.collinear.x < 0) {
+                    swap(lowerBound, upperBound, "x");
+                }
+                if (this.collinear.y < 0) {
+                    swap(lowerBound, upperBound, "y");
+                }
+
+                // lambda must be bigger than both components of lowerBound
+                // and smaller than both components of upperBound, so:
+                lowerBound.x = lowerBound.y = lowerBound.maxComponent();
+                upperBound.x = upperBound.y = upperBound.minComponent();
+                if (!lowerBound.lte(upperBound)) {
+                    return new Intersection(IntersectionType.empty);
+                }
+
+                var pointLowerBound = lowerBound.componentProduct(this.collinear)
+                                                .add(pointFromLine);
+                var pointUpperBound = upperBound.componentProduct(this.collinear)
+                                                .add(pointFromLine);
+                return new Intersection(IntersectionType.range,
+                                        pointLowerBound,
+                                        pointUpperBound,
+                                        lowerBound,
+                                        upperBound);
+            break;
+            case Collidables.LineSegment:
+                var lineSegment = figure;
+                var intersectionWithParentLine = this.intersect(lineSegment.line);
+                console.log("##", intersectionWithParentLine);
+                if (intersectionWithParentLine.type === IntersectionType.empty) {
+                    return intersectionWithParentLine;
+                }
+                var point = intersectionWithParentLine.point;
+                var scalingVector = lineSegment.endPoint.sub(lineSegment.startPoint)
+                                                        .reciproc();
+                var normalizedPoint = point.sub(lineSegment.startPoint)
+                                           .componentProduct(scalingVector);
+                if (Vector2.zero.lte(normalizedPoint) &&
+                    normalizedPoint.lte(Vector2.unit)) {
+                    return intersectionWithParentLine;
+                }
+                return new Intersection(IntersectionType.empty);
+            break;
+        };
+    };
+
+    return Line;
+})();
+
+
+var LineSegment = (function () {
+    function LineSegment(a, b) {
+        this.startPoint = a;
+        this.endPoint = b;
+        this.line = new Collidables.Line(a, b);
+        var self = this;
+        Object.defineProperty(this, "color", {
+            get: function () { return self.line.color; },
+            set: function (value) { self.line.color = value; }
+        });
+    }
+
+    LineSegment.prototype.draw = function (context) {
+        context.save();
+        context.strokeStyle = this.color;
+        context.beginPath();
+        context.moveTo(this.startPoint.x, this.startPoint.y);
+        context.lineTo(this.endPoint.x, this.endPoint.y);
+        context.stroke();
+        context.restore();
+    };
+
+    LineSegment.prototype.intersect = function (figure) {
+    };
+
+    return LineSegment;
+})();
+
+var Rect = (function () {
+    function Rect(topLeft, size) {
+        this.topLeft =  topLeft;
+        if (typeof size === "number") {
+            size = new Vector2(size, size);
+        }
+        this.size = size;
+        this.color = randomColor();
+    };
+
+    Rect.prototype.draw = function (context) {
+        context.save();
+        context.strokeStyle = this.color;
+        context.strokeRect(this.topLeft.x, this.topLeft.y, this.size.x, this.size.y);
+        context.restore();
+    };
+
+    return Rect;
+})();
+
+var Circle = (function () {
+    function Circle(center, radius) {
+        this.center = center;
+        this.radius = radius;
+        this.color = randomColor();
+    }
+
+    Circle.prototype.draw = function (context) {
+        context.save();
+        context.strokeStyle = this.color;
+        context.beginPath();
+        context.arc(this.center.x, this.center.y, this.radius, 0, 2 * Math.PI);
+        context.closePath();
+        context.stroke();
+        context.restore();
+    };
+
+    return Circle;
+})();
+
+return {
+    IntersectionType: IntersectionType,
+    Intersection: Intersection,
+    Line: Line,
+    LineSegment: LineSegment,
+    Rect: Rect,
+    Circle: Circle,
+};
+})();
+
+var figures = [
+    new Collidables.Line(new Vector2(100, 100), new Vector2(200, 200)),
+    new Collidables.Line(new Vector2(200, 200), new Vector2(400, 100)),
+    new Collidables.Rect(new Vector2(120, 130), new Vector2(50, 300)),
+    new Collidables.LineSegment(new Vector2(100, 350), new Vector2(350, 300)),
+];
+figures.push(figures[0].intersect(figures[1]).getDrawable());
+figures.push(figures[0].intersect(figures[2]).getDrawable());
+figures.push(figures[0].intersect(figures[3]).getDrawable());
+//figures[figures.length - 1].color = "black";
+
+var update = function () {
+    
+    setTimeout(update, 1000);
+}
+
+
+var draw = function () {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.lineWidth = 5;
+
+    figures.forEach(function (f) {
+        f && f.draw(context);
+    });
+    requestAnimationFrame(draw);
+}
+
+draw();
+</script>

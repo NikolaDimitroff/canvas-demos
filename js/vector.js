@@ -59,6 +59,9 @@ Vector2.prototype.negate = function () {
 }
 
 Vector2.prototype.add = function (other) {
+    if (typeof other == "number") {
+        return new Vector2(this.x + other, this.y + other);
+    }
     return new Vector2(this.x + other.x, this.y + other.y);
 }
 
@@ -78,5 +81,28 @@ Vector2.prototype.truncate = function (limit) {
     }
 }
 
+Vector2.prototype.componentProduct = function (other) {
+    return new Vector2(this.x * other.x, this.y * other.y);
+};
+
+Vector2.prototype.maxComponent = function () {
+    return Math.max(this.x, this.y);
+};
+
+Vector2.prototype.minComponent = function () {
+    return Math.min(this.x, this.y);
+}
+
+Vector2.prototype.reciproc = function () {
+    return new Vector2(1 / this.x, 1 / this.y);
+};
+
+Vector2.prototype.lte = function (other) {
+    return this.x <= other.x && this.y <= other.y;
+}
+
+Vector2.zero = new Vector2(0, 0);
 Vector2.right = new Vector2(1, 0);
+Vector2.left = new Vector2(-1, 0);
 Vector2.up = new Vector2(0, 1);
+Vector2.unit = new Vector2(1, 1);

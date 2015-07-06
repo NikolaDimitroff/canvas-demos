@@ -40,7 +40,7 @@ var Primitives = (function () {
         ctx.restore();
         ctx.fill();
     }
-    
+    Line.prototype.draw = Line.prototype.drawWithArrowheads;
     return {
         Line: Line,
     };
