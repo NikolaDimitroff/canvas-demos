@@ -1,4 +1,4 @@
-<canvas id="voronoi" width="100%" height="100%"/>
+<canvas id="drawing-canvas" width="100%" height="100%"/>
 
 <style>
 #tiling {
@@ -15,7 +15,7 @@ html, body {
 <script src="js/mouser.js"></script>
 <script src="js/primitives.js"></script>
 <script>
-var canvas = document.getElementById("voronoi"),
+var canvas = document.getElementById("drawing-canvas"),
     context = canvas.getContext("2d");
 
 Resizer.installHandler(canvas);
@@ -262,6 +262,26 @@ var Circle = (function () {
     return Circle;
 })();
 
+var Ellipse = (function () {
+    function Ellipse(focus1, focus2, majorAxis, minorAxis) {
+        this.center = focus1.add(focus2).scaled(0.5);
+        this.major = majorAxis;
+        this.minor = minorAxis;
+        this.color = randomColor();
+    }
+
+    Ellipse.prototype.draw = function (context) {
+        context.save();
+        context.strokeStyle = this.color;
+        context.scale(this.major / this.minor, 1);
+        context.beginPath();
+        context.arc(this.center.x, this.center.y, this.major - this.minor, 0, 2 * Math.PI);
+        context.stroke();
+        context.restore();
+    };
+    return Ellipse;
+})();
+
 return {
     IntersectionType: IntersectionType,
     Intersection: Intersection,
@@ -269,6 +289,7 @@ return {
     LineSegment: LineSegment,
     Rect: Rect,
     Circle: Circle,
+    Ellipse: Ellipse
 };
 })();
 
@@ -277,6 +298,10 @@ var figures = [
     new Collidables.Line(new Vector2(200, 200), new Vector2(400, 100)),
     new Collidables.Rect(new Vector2(120, 130), new Vector2(50, 300)),
     new Collidables.LineSegment(new Vector2(100, 350), new Vector2(350, 300)),
+    new Collidables.Ellipse(new Vector2(200, 400), new Vector2(400, 400), 200, 100),
+    new Collidables.Circle(new Vector2(200, 400), 20),
+    new Collidables.Circle(new Vector2(400, 400), 20),
+    new Collidables.Circle(new Vector2(200, 400).add(new Vector2(400, 400)).scaled(0.5), 20)
 ];
 figures.push(figures[0].intersect(figures[1]).getDrawable());
 figures.push(figures[0].intersect(figures[2]).getDrawable());

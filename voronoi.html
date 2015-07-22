@@ -1,0 +1,72 @@
+<canvas id="voronoi" width="100%" height="100%"/>
+
+<style>
+#tiling {
+    border: 1px solid black;
+}
+html, body {
+    margin: 0;
+    padding: 0;
+}
+</style>
+
+<script src="js/vector.js"></script>
+<script src="js/resizer.js"></script>
+<script>
+var canvas = document.getElementById("voronoi"),
+    context = canvas.getContext("2d");
+
+Resizer.installHandler(canvas);
+
+var update = function () {
+    
+    setTimeout(update, 1000);
+}
+
+function randomColor() {
+    return '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16);
+}
+
+var MAX_POINTS = 100;
+var points = [];
+for (var i = 0; i < MAX_POINTS; i++) {
+    var x = Math.random() * canvas.width,
+        y = Math.random() * canvas.height;
+        
+    var p = new Vector2(x, y);
+    p.color = randomColor();
+    points.push(p);
+}
+
+var cellSize = {
+    row: 10,
+    col: 10,
+}
+
+var draw = function () {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    
+    var perRow = canvas.width / cellSize.col,
+        perCol = canvas.height / cellSize.row;
+    for (var i = 0; i < perRow; i++) {
+        for (var j = 0; j < perCol; j++) {
+            var current = new Vector2((cellSize.row + 0.5) * i, (cellSize.col + 0.5) * j);
+            var distances = points.map(current.distTo.bind(current));
+            var sorted = distances.slice(0);
+            sorted.sort();
+            if (sorted[0] == sorted[1]) {
+                context.fillStyle = "black";
+            }
+            else {
+                var closest = points[distances.indexOf(Math.min.apply(null, distances))];
+                context.fillStyle = closest.color;
+            }
+            context.fillRect(cellSize.row * i, cellSize.col * j, cellSize.row, cellSize.col);
+        }
+    }
+   // requestAnimationFrame(draw);
+}
+
+draw();
+</script>
