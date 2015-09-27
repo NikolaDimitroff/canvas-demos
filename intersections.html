@@ -1,4 +1,4 @@
-<canvas id="voronoi" width="100%" height="100%"/>
+<canvas id="canvas" width="100%" height="100%"/>
 
 <style>
 #tiling {
@@ -15,7 +15,7 @@ html, body {
 <script src="js/mouser.js"></script>
 <script src="js/primitives.js"></script>
 <script>
-var canvas = document.getElementById("voronoi"),
+var canvas = document.getElementById("canvas"),
     context = canvas.getContext("2d");
 
 Resizer.installHandler(canvas);
@@ -92,10 +92,11 @@ var Line = (function () {
         this.slope = (a.y - b.y) / (a.x - b.x);
         this.offset = a.y - this.slope * a.x;
         // The line's standart equation is kx - y + b= 0,
-        // Thus, normalize((k, -1)) is normal to the line whilenormalize
+        // Thus, normalize((k, -1)) is normal to the line while
         // normalize((1, k)) is collinear
         this.collinear = new Vector2(1, this.slope);
         this.collinear.normalize();
+		this.point = a;
         this.color = randomColor();
     }
 
@@ -116,76 +117,10 @@ var Line = (function () {
     Line.prototype.intersect = function (figure) {
         switch (figure.constructor) {
             case Collidables.Line:
-                // k1x + b1 = k2x + b2
-                // k1x - k2x = b2 - b1
-                // x = (b2 - b1) / (k1 - k2)
-                if (epsilonEquals(this.slope, figure.slope)) {
-                    return new Collidables.Intersection(IntersectionType.empty);
-                }
-                var x = (figure.offset - this.offset) / (this.slope - figure.slope);
-                var y = this.slope * x + this.offset;
-                return new Collidables.Intersection(IntersectionType.singlePoint, new Vector2(x, y));
             break;
             case Collidables.Rect:
-                var rect = figure;
-                // Let the area under the rect be defined as all points P such as
-                //    rect.topLeft <= P <= rect.topLeft + rect.size
-                // Let M = randomPointFromL + lambda * l.collinear.
-                // See if there's an M for which the rect inequalities hold
-                var pointFromLine = new Vector2(0, this.offset);
-                var oneOverCollinear = new Vector2(1 / this.collinear.x,
-                                                   1 / this.collinear.y);
-                // topLeft <= pointFromLine + lambda * collinear
-                var lowerBound = rect.topLeft.sub(pointFromLine)
-                                             .componentProduct(oneOverCollinear);
-                // pointFromLine + lambda * collinear <= rect.topLeft + rect.size
-                var upperBound = rect.topLeft.add(rect.size)
-                                             .sub(pointFromLine)
-                                             .componentProduct(oneOverCollinear);
-                // If it was the case that either of collinear components was
-                // negative, the inequalities containg it should be swapped
-                if (this.collinear.x < 0) {
-                    swap(lowerBound, upperBound, "x");
-                }
-                if (this.collinear.y < 0) {
-                    swap(lowerBound, upperBound, "y");
-                }
-
-                // lambda must be bigger than both components of lowerBound
-                // and smaller than both components of upperBound, so:
-                lowerBound.x = lowerBound.y = lowerBound.maxComponent();
-                upperBound.x = upperBound.y = upperBound.minComponent();
-                if (!lowerBound.lte(upperBound)) {
-                    return new Intersection(IntersectionType.empty);
-                }
-
-                var pointLowerBound = lowerBound.componentProduct(this.collinear)
-                                                .add(pointFromLine);
-                var pointUpperBound = upperBound.componentProduct(this.collinear)
-                                                .add(pointFromLine);
-                return new Intersection(IntersectionType.range,
-                                        pointLowerBound,
-                                        pointUpperBound,
-                                        lowerBound,
-                                        upperBound);
+                
             break;
-            case Collidables.LineSegment:
-                var lineSegment = figure;
-                var intersectionWithParentLine = this.intersect(lineSegment.line);
-                console.log("##", intersectionWithParentLine);
-                if (intersectionWithParentLine.type === IntersectionType.empty) {
-                    return intersectionWithParentLine;
-                }
-                var point = intersectionWithParentLine.point;
-                var scalingVector = lineSegment.endPoint.sub(lineSegment.startPoint)
-                                                        .reciproc();
-                var normalizedPoint = point.sub(lineSegment.startPoint)
-                                           .componentProduct(scalingVector);
-                if (Vector2.zero.lte(normalizedPoint) &&
-                    normalizedPoint.lte(Vector2.unit)) {
-                    return intersectionWithParentLine;
-                }
-                return new Intersection(IntersectionType.empty);
             break;
         };
     };
@@ -262,6 +197,115 @@ var Circle = (function () {
     return Circle;
 })();
 
+
+var Intersectors = {};
+
+Intersectors.LineToLine = function (line1, line2) {
+	// k1x + b1 = k2x + b2
+	// k1x - k2x = b2 - b1
+	// x = (b2 - b1) / (k1 - k2)
+	if (epsilonEquals(line1.slope, line2.slope)) {
+		return new Collidables.Intersection(IntersectionType.empty);
+	}
+	var x = (line2.offset - line1.offset) / (line1.slope - line2.slope);
+	var y = line1.slope * x + line1.offset;
+	return new Collidables.Intersection(IntersectionType.singlePoint, new Vector2(x, y));
+};
+
+Intersectors.LineToLine = function (line1, line2) {
+	if (epsilonEquals(line1.collinear.x, 0) || epsilonEquals(line2.collinear.y, 0)) {
+		return new Intersection(IntersectionType.none);
+	}
+	var mu1 = (line2.point.x + mu2 * col2x - P1x) / col1x
+	// k1x + b1 = k2x + b2
+	// k1x - k2x = b2 - b1
+	// x = (b2 - b1) / (k1 - k2)
+	if (epsilonEquals(line1.slope, line2.slope)) {
+		return new Collidables.Intersection(IntersectionType.empty);
+	}
+	var x = (line2.offset - line1.offset) / (line1.slope - line2.slope);
+	var y = line1.slope * x + line1.offset;
+	return new Collidables.Intersection(IntersectionType.singlePoint, new Vector2(x, y));
+};
+
+
+
+Intersectors.LineToLineSegment = function (line, lineSegment) {
+	var intersectionWithParentLine = intersect(line, lineSegment.line);
+	console.log("##", intersectionWithParentLine);
+	if (intersectionWithParentLine.type === IntersectionType.empty) {
+		return intersectionWithParentLine;
+	}
+	var point = intersectionWithParentLine.point;
+	var scalingVector = lineSegment.endPoint.sub(lineSegment.startPoint)
+											.reciproc();
+	var normalizedPoint = point.sub(lineSegment.startPoint)
+							   .componentProduct(scalingVector);
+	if (Vector2.zero.lte(normalizedPoint) &&
+		normalizedPoint.lte(Vector2.unit)) {
+		return intersectionWithParentLine;
+	}
+	return new Intersection(IntersectionType.empty);
+};
+
+Intersectors.LineToRect = function (line, rect) {
+	// Let the area under the rect be defined as all points P such as
+	//    rect.topLeft <= P <= rect.topLeft + rect.size
+	// Let M = randomPointFromL + lambda * l.collinear.
+	// See if there's an M for which the rect inequalities hold
+	var pointFromLine = new Vector2(0, line.offset);
+	var oneOverCollinear = new Vector2(1 / line.collinear.x,
+									   1 / line.collinear.y);
+	// topLeft <= pointFromLine + lambda * collinear
+	var lowerBound = rect.topLeft.sub(pointFromLine)
+								 .componentProduct(oneOverCollinear);
+	// pointFromLine + lambda * collinear <= rect.topLeft + rect.size
+	var upperBound = rect.topLeft.add(rect.size)
+								 .sub(pointFromLine)
+								 .componentProduct(oneOverCollinear);
+	// If it was the case that either of collinear components was
+	// negative, the inequalities containg it should be swapped
+	if (line.collinear.x < 0) {
+		swap(lowerBound, upperBound, "x");
+	}
+	if (line.collinear.y < 0) {
+		swap(lowerBound, upperBound, "y");
+	}
+
+	// lambda must be bigger than both components of lowerBound
+	// and smaller than both components of upperBound, so:
+	lowerBound.x = lowerBound.y = lowerBound.maxComponent();
+	upperBound.x = upperBound.y = upperBound.minComponent();
+	if (!lowerBound.lte(upperBound)) {
+		return new Intersection(IntersectionType.empty);
+	}
+
+	var pointLowerBound = lowerBound.componentProduct(line.collinear)
+									.add(pointFromLine);
+	var pointUpperBound = upperBound.componentProduct(line.collinear)
+									.add(pointFromLine);
+	return new Intersection(IntersectionType.range,
+							pointLowerBound,
+							pointUpperBound,
+							lowerBound,
+							upperBound);
+};
+
+
+var intersect = function (shape1, shape2) {
+	var type1 = shape1.constructor;
+	var type2 = shape2.constructor;
+	var intersectionFunctionName = type1.name + "To" + type2.name;
+	var intersectionFunction = Intersectors[intersectionFunctionName];
+	if (!intersectionFunction) {
+		var reverseFunction = Intersectors[intersectionFunctionName];
+		var intersectionFunction = function (shape2, shape1) {
+			return reverseFunction(shape1, shape2);
+		};
+	}
+	return intersectionFunction(shape1, shape2);
+};
+
 return {
     IntersectionType: IntersectionType,
     Intersection: Intersection,
@@ -269,8 +313,12 @@ return {
     LineSegment: LineSegment,
     Rect: Rect,
     Circle: Circle,
+	intersect: intersect
 };
 })();
+
+
+
 
 var figures = [
     new Collidables.Line(new Vector2(100, 100), new Vector2(200, 200)),
@@ -278,9 +326,10 @@ var figures = [
     new Collidables.Rect(new Vector2(120, 130), new Vector2(50, 300)),
     new Collidables.LineSegment(new Vector2(100, 350), new Vector2(350, 300)),
 ];
-figures.push(figures[0].intersect(figures[1]).getDrawable());
-figures.push(figures[0].intersect(figures[2]).getDrawable());
-figures.push(figures[0].intersect(figures[3]).getDrawable());
+var intersect = Collidables.intersect;
+figures.push(intersect(figures[0], figures[1]).getDrawable());
+figures.push(intersect(figures[0], figures[2]).getDrawable());
+figures.push(intersect(figures[0], figures[3]).getDrawable());
 //figures[figures.length - 1].color = "black";
 
 var update = function () {
@@ -288,6 +337,10 @@ var update = function () {
     setTimeout(update, 1000);
 }
 
+var requestAnimationFrame = requestAnimationFrame || function (cb) {
+	cb();
+	setTimeout(cb, 1000 / 60);
+};
 
 var draw = function () {
     context.clearRect(0, 0, canvas.width, canvas.height);
